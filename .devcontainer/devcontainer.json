@@ -1,0 +1,5 @@
+{
+  "image": "mcr.microsoft.com/windows-cssc/python3.7.2server:ltsc2022",
+  "features": {
+  }
+}
