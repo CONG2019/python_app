@@ -1,0 +1,116 @@
+#!/bin/bash
+# A script that provide environment to run python spiders
+
+RED="\033[31;1m"
+GREEN="\033[32;1m"
+END="\033[0m"
+
+DOCKER_IMAGE="cong2021/spider"
+CONTAINER_NAME="spiderenv"
+WORK_PATH=`pwd`
+MOUNT_DIR="/work"
+DEFAULT_LANGUAGE="C.UTF-8"
+TAG="latest"
+
+echo_red(){
+    echo -e ${RED}"$*"${END}
+}
+
+echo_green(){
+    echo -e ${GREEN}"$*"${END}
+}
+
+PROGRAM=${0}
+usage(){
+    cat <<EOF
+Usage: ${PROGRAM} options
+-h, --help                  Show usage.
+-i, --init                  Check dependency.
+-u, --update                Update docker image.
+-t,--tag                    Tag of docker image.
+[COMMON]                    Common that will run in docker.
+EOF
+}
+
+__init(){
+    docker --version > /dev/null
+    if [ $? != 0 ]
+    then
+        echo -e ${RED}"Please install docker."${END}
+        exit -1
+    fi
+
+    docker images|grep ${DOCKER_IMAGE} > /dev/null
+    if [ $? != 0 ]
+    then
+        echo -e ${GREEN}"Docker image ${DOCKER_IMAGE} do not exist."
+        echo -e "Pull ..."${END}
+        docker pull ${DOCKER_IMAGE}:${TAG}
+    fi
+}
+
+__update(){
+    docker pull ${DOCKER_IMAGE}:${TAG}
+}
+
+main(){
+    __init
+
+    docker ps -a |grep ${CONTAINER_NAME} > /dev/null
+    if [ $? == 0 ]
+    then
+        docker rm ${CONTAINER_NAME}
+    fi
+
+    docker run -it -v ${WORK_PATH}:${MOUNT_DIR} -w ${MOUNT_DIR} -p 8888:8888 -e LC_ALL=${DEFAULT_LANGUAGE} --name ${CONTAINER_NAME} ${DOCKER_IMAGE}:${TAG} $@
+    # docker rm ${CONTAINER_NAME} > /dev/null
+}
+
+ARGS=`getopt -o "iuht:" --long "init,update,help,tag:" -n "${0}" -- "$@"`
+if [ $? != 0 ]; then
+    usage
+    exit $?
+fi
+echo ARGS=[$ARGS]
+eval set -- "${ARGS}"
+
+while [ $# -gt 0 ] 
+do
+    case ${1} in
+        -i|--init)
+            __init
+            shift
+            exit 0
+            ;;
+        -u|--update)
+            __update
+            shift
+            exit 0
+            ;;
+        -h|--help)
+            shift
+            usage
+            exit 0
+            ;;
+        -t|--tag)
+            TAG=$2
+            echo_green "Using tag ${TAG}"
+            shift 2
+            ;;
+        --)
+            shift
+            if [ $# -ge 1 ]; then
+                main "$@"
+                exit $?
+            else
+                usage
+                exit 0
+            fi
+            ;;
+        *)
+            main "$@"
+            exit $?
+            ;;
+    esac
+done
+
